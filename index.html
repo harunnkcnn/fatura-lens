@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self' about: blob: data:; object-src 'none'; base-uri 'self'; form-action 'none'"
+    />
+    <meta name="description" content="e-Fatura, e-Arşiv ve e-İrsaliye XML dosyalarını tarayıcıda, sunucuya göndermeden toplu okuyun, KDV/tevkifat özetini görün, Excel'e aktarın." />
+    <meta name="theme-color" content="#eef1f4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#11161c" media="(prefers-color-scheme: dark)" />
+    <meta property="og:title" content="Fatura Lens" />
+    <meta property="og:description" content="Open-source, offline batch reader for Turkish e-invoice (UBL-TR) XML files." />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <title>Fatura Lens</title>
+  </head>
+  <body>
+    <noscript>Fatura Lens JavaScript gerektirir. / Fatura Lens requires JavaScript.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security issue / Güvenlik açığı
+    url: https://github.com/harunnkcnn/fatura-lens/security/advisories/new
+    about: Report privately, not as a public issue.

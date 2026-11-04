@@ -1,0 +1,433 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { DetailPanel } from './components/DetailPanel';
+import { DocTable, sortDocs, type SortKey, type SortState } from './components/DocTable';
+import { DownloadIcon, Logo, SheetsIllustration, ShieldIcon, UploadIcon } from './components/Icons';
+import { Totals } from './components/Totals';
+import { usePersistentState } from './hooks/usePersistentState';
+import { dateFormatter, detectLocale, dictionaries, moneyFormatter, numberFormatter, type Locale } from './i18n';
+import { directionOf, mergeDocuments, summarize, worstLevel } from './lib/aggregate';
+import { documentRows, downloadText, lineRows, toCsv } from './lib/csv';
+import { ingest, readFiles, type IngestSource } from './lib/ingest';
+import { SAMPLE_MY_VKN, sampleFiles } from './lib/samples';
+import type { IngestError, UblDocument } from './lib/types';
+
+type Theme = 'system' | 'light' | 'dark';
+type KindFilter = 'all' | 'invoice' | 'despatch';
+type DirFilter = 'all' | 'incoming' | 'outgoing';
+
+const PAGE = 300;
+const ACCEPT = '.xml,.zip,application/xml,text/xml,application/zip';
+const isLocale = (v: string): v is Locale => v === 'tr' || v === 'en';
+const isTheme = (v: string): v is Theme => v === 'system' || v === 'light' || v === 'dark';
+
+export default function App() {
+  const [locale, setLocale] = usePersistentState<Locale>('fl.locale', detectLocale, isLocale);
+  const [theme, setTheme] = usePersistentState<Theme>('fl.theme', 'system', isTheme);
+  const [myIdsText, setMyIdsText] = usePersistentState<string>('fl.myIds', '');
+  const t = dictionaries[locale];
+
+  const [docs, setDocs] = useState<UblDocument[]>([]);
+  const [errors, setErrors] = useState<IngestError[]>([]);
+  const [skipped, setSkipped] = useState(0);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [importCount, setImportCount] = useState(0);
+
+  const [query, setQuery] = useState('');
+  const [kind, setKind] = useState<KindFilter>('all');
+  const [dir, setDir] = useState<DirFilter>('all');
+  const [onlyIssues, setOnlyIssues] = useState(false);
+  const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' });
+  const [limit, setLimit] = useState(PAGE);
+
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    document.title = `Fatura Lens: ${t.appTagline}`;
+  }, [locale, t]);
+
+  useEffect(() => {
+    if (theme === 'system') delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  const myIds = useMemo(() => new Set(myIdsText.split(/[\s,;]+/).filter((v) => /^\d{10,11}$/.test(v))), [myIdsText]);
+  const money = useMemo(() => moneyFormatter(locale), [locale]);
+  const qty = useMemo(() => numberFormatter(locale), [locale]);
+  const date = useMemo(() => dateFormatter(locale), [locale]);
+
+  const addSources = useCallback(async (sources: IngestSource[]) => {
+    if (sources.length === 0) return;
+    setProgress({ done: 0, total: sources.length });
+    try {
+      const result = await ingest(sources, (done, total) => setProgress({ done, total }));
+      setDocs((current) => {
+        const merged = mergeDocuments(current, result.docs);
+        setSkipped(merged.skippedDuplicates);
+        return merged.docs;
+      });
+      setErrors(result.errors);
+      setImportCount((n) => n + 1);
+    } finally {
+      setProgress(null);
+    }
+  }, []);
+
+  const addFiles = useCallback(async (files: FileList | File[]) => addSources(await readFiles(files)), [addSources]);
+
+  const loadSamples = () => {
+    const encoder = new TextEncoder();
+    if (!myIdsText) setMyIdsText(SAMPLE_MY_VKN);
+    void addSources(sampleFiles().map((s) => ({ name: s.name, bytes: encoder.encode(s.xml) })));
+  };
+
+  // Whole-window drag and drop.
+  useEffect(() => {
+    let depth = 0;
+    const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files');
+    const enter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth += 1;
+      setDragging(true);
+    };
+    const over = (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
+    const leave = () => {
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setDragging(false);
+    };
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setDragging(false);
+      if (e.dataTransfer?.files.length) void addFiles(e.dataTransfer.files);
+    };
+    window.addEventListener('dragenter', enter);
+    window.addEventListener('dragover', over);
+    window.addEventListener('dragleave', leave);
+    window.addEventListener('drop', drop);
+    return () => {
+      window.removeEventListener('dragenter', enter);
+      window.removeEventListener('dragover', over);
+      window.removeEventListener('dragleave', leave);
+      window.removeEventListener('drop', drop);
+    };
+  }, [addFiles]);
+
+  // "/" focuses search, like most data tools.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) && !selectedKey) {
+        e.preventDefault();
+        searchInput.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedKey]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase('tr');
+    return docs.filter((d) => {
+      if (kind === 'invoice' && d.kind === 'despatch') return false;
+      if (kind === 'despatch' && d.kind !== 'despatch') return false;
+      if (dir !== 'all' && directionOf(d, myIds) !== dir) return false;
+      if (onlyIssues && worstLevel(d) !== 'error' && worstLevel(d) !== 'warning') return false;
+      if (!q) return true;
+      const haystack = [
+        d.number,
+        d.uuid,
+        d.fileName,
+        d.profile,
+        d.typeCode,
+        d.supplier.name,
+        d.supplier.vkn,
+        d.supplier.tckn,
+        d.customer.name,
+        d.customer.vkn,
+        d.customer.tckn,
+        d.despatch?.plate,
+        d.despatch?.driver,
+        ...d.lines.map((l) => l.name),
+      ]
+        .filter(Boolean)
+        .join('\n')
+        .toLocaleLowerCase('tr');
+      return haystack.includes(q);
+    });
+  }, [docs, query, kind, dir, onlyIssues, myIds]);
+
+  const sorted = useMemo(() => sortDocs(filtered, sort), [filtered, sort]);
+  const summary = useMemo(() => summarize(filtered), [filtered]);
+  const issueDocs = filtered.filter((d) => {
+    const level = worstLevel(d);
+    return level === 'error' || level === 'warning';
+  });
+  const selected = docs.find((d) => d.key === selectedKey) ?? null;
+
+  useEffect(() => setLimit(PAGE), [query, kind, dir, onlyIssues]);
+
+  const onSort = (key: SortKey) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'supplier' || key === 'customer' || key === 'number' ? 'asc' : 'desc' }));
+
+  const closePanel = () => {
+    setSelectedKey(null);
+    opener.current?.focus();
+  };
+
+  const resetFilters = () => {
+    setQuery('');
+    setKind('all');
+    setDir('all');
+    setOnlyIssues(false);
+  };
+
+  const clearAll = () => {
+    setDocs([]);
+    setErrors([]);
+    setSkipped(0);
+    setSelectedKey(null);
+    resetFilters();
+  };
+
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const csvHeaders = {
+    docs:
+      locale === 'tr'
+        ? ['Tür', 'Yön', 'Senaryo', 'Tip', 'Belge no', 'ETTN', 'Tarih', 'Gönderen', 'Gönderen VKN/TCKN', 'Alıcı', 'Alıcı VKN/TCKN', 'Para birimi', 'Kur', 'Matrah', 'KDV', 'Tevkifat', 'Vergiler dahil', 'Ödenecek', 'Satır sayısı', 'Plaka', 'Bulgu sayısı', 'Dosya']
+        : ['Kind', 'Direction', 'Profile', 'Type', 'Number', 'ETTN', 'Date', 'Supplier', 'Supplier ID', 'Customer', 'Customer ID', 'Currency', 'Rate', 'Net', 'VAT', 'Withholding', 'Incl. taxes', 'Payable', 'Lines', 'Plate', 'Findings', 'File'],
+    lines:
+      locale === 'tr'
+        ? ['Belge no', 'Tarih', 'Gönderen', 'Alıcı', 'Satır', 'Mal/hizmet', 'Miktar', 'Birim', 'Birim fiyat', 'Tutar', 'KDV %', 'Para birimi']
+        : ['Number', 'Date', 'Supplier', 'Customer', 'Line', 'Item', 'Qty', 'Unit', 'Unit price', 'Amount', 'VAT %', 'Currency'],
+  };
+
+  const onPick = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) void addFiles(e.target.files);
+    e.target.value = '';
+  };
+
+  const hasDocs = docs.length > 0;
+
+  return (
+    <div className="shell">
+      <header className="masthead">
+        <a className="wordmark" href="./" aria-label="Fatura Lens">
+          <Logo />
+          <div>
+            <strong>Fatura Lens</strong>
+            <br />
+            <span>{t.appTagline}</span>
+          </div>
+        </a>
+        <div className="settings">
+          <label className="field">
+            {t.myIds}
+            <input
+              className="input input-ids"
+              inputMode="numeric"
+              autoComplete="off"
+              value={myIdsText}
+              placeholder={t.myIdsPlaceholder}
+              onChange={(e) => setMyIdsText(e.target.value)}
+              aria-describedby="ids-help"
+            />
+            <span id="ids-help" className="visually-hidden">
+              {t.myIdsHelp}
+            </span>
+          </label>
+          <div className="field">
+            <span id="lang-label">{t.language}</span>
+            <div className="seg" role="group" aria-labelledby="lang-label">
+              {(['tr', 'en'] as const).map((l) => (
+                <button key={l} type="button" aria-pressed={locale === l} onClick={() => setLocale(l)} lang={l}>
+                  {l.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="field">
+            {t.themeToggle}
+            <select className="select" value={theme} onChange={(e) => setTheme(e.target.value as Theme)}>
+              <option value="system">{t.themeSystem}</option>
+              <option value="light">{t.themeLight}</option>
+              <option value="dark">{t.themeDark}</option>
+            </select>
+          </label>
+        </div>
+      </header>
+
+      <input ref={fileInput} type="file" accept={ACCEPT} multiple hidden onChange={onPick} />
+
+      {!hasDocs ? (
+        <main className="intro">
+          <div>
+            <h1>{t.heroTitle}</h1>
+            <p>{t.heroBody}</p>
+            <p className="privacy">
+              <ShieldIcon />
+              <span>{t.privacy}</span>
+            </p>
+          </div>
+          <div className={`dropzone${dragging ? ' is-over' : ''}`}>
+            <SheetsIllustration />
+            <div className="actions">
+              <button type="button" className="btn btn-primary" onClick={() => fileInput.current?.click()}>
+                <UploadIcon />
+                {t.dropCta}
+              </button>
+              <button type="button" className="btn" onClick={loadSamples}>
+                {t.trySamples}
+              </button>
+            </div>
+            <span className="hint">{t.dropHint}</span>
+            {progress && (
+              <span className="hint" role="status">
+                {t.loading(progress.done, progress.total)}
+              </span>
+            )}
+          </div>
+          {errors.length > 0 && <ErrorNotice t={t} errors={errors} onDismiss={() => setErrors([])} />}
+        </main>
+      ) : (
+        <main>
+          <div className="toolbar">
+            <label className="search">
+              <span className="visually-hidden">{t.searchLabel}</span>
+              <input ref={searchInput} className="input" type="search" placeholder={t.search} value={query} onChange={(e) => setQuery(e.target.value)} />
+            </label>
+            <div className="seg" role="group" aria-label={t.colType}>
+              {(
+                [
+                  ['all', t.kindAll],
+                  ['invoice', t.kindInvoice],
+                  ['despatch', t.kindDespatch],
+                ] as const
+              ).map(([value, label]) => (
+                <button key={value} type="button" aria-pressed={kind === value} onClick={() => setKind(value)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {myIds.size > 0 && (
+              <select className="select" value={dir} onChange={(e) => setDir(e.target.value as DirFilter)} aria-label={t.dirAll}>
+                <option value="all">{t.dirAll}</option>
+                <option value="incoming">{t.dirIncoming}</option>
+                <option value="outgoing">{t.dirOutgoing}</option>
+              </select>
+            )}
+            <label className="check">
+              <input type="checkbox" checked={onlyIssues} onChange={(e) => setOnlyIssues(e.target.checked)} />
+              {t.onlyIssues}
+            </label>
+            <span className="spacer" />
+            <button type="button" className="btn btn-primary" onClick={() => fileInput.current?.click()}>
+              <UploadIcon />
+              {t.addFiles}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => downloadText(toCsv(documentRows(sorted, myIds), { locale, headers: csvHeaders.docs }), `fatura-lens-${locale === 'tr' ? 'belgeler' : 'documents'}-${stamp}.csv`)}
+            >
+              <DownloadIcon />
+              {t.exportDocs}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => downloadText(toCsv(lineRows(sorted), { locale, headers: csvHeaders.lines }), `fatura-lens-${locale === 'tr' ? 'satirlar' : 'lines'}-${stamp}.csv`)}
+            >
+              <DownloadIcon />
+              {t.exportLines}
+            </button>
+            <button type="button" className="btn btn-quiet" onClick={clearAll}>
+              {t.clearAll}
+            </button>
+          </div>
+
+          {progress && (
+            <div className="notice" role="status">
+              {t.loading(progress.done, progress.total)}
+            </div>
+          )}
+          {skipped > 0 && (
+            <div className="notice" role="status">
+              {t.skipped(skipped)}
+              <button type="button" className="btn btn-quiet" onClick={() => setSkipped(0)}>
+                {t.dismiss}
+              </button>
+            </div>
+          )}
+          {errors.length > 0 && <ErrorNotice t={t} errors={errors} onDismiss={() => setErrors([])} />}
+
+          <Totals t={t} money={money} summary={summary} issueCount={issueDocs.length} hasErrors={issueDocs.some((d) => worstLevel(d) === 'error')} stampKey={importCount} />
+
+          {sorted.length === 0 ? (
+            <div className="table-wrap empty-filter">
+              <p>{t.noMatch}</p>
+              <button type="button" className="btn" onClick={resetFilters}>
+                {t.resetFilters}
+              </button>
+            </div>
+          ) : (
+            <DocTable
+              t={t}
+              docs={sorted.slice(0, limit)}
+              total={sorted.length}
+              sort={sort}
+              onSort={onSort}
+              selectedKey={selectedKey}
+              onOpen={(doc, el) => {
+                opener.current = el;
+                setSelectedKey(doc.key);
+              }}
+              myIds={myIds}
+              money={money}
+              date={date}
+              canShowMore={sorted.length > limit}
+              onShowMore={() => setLimit((l) => l + PAGE)}
+            />
+          )}
+        </main>
+      )}
+
+      <footer className="site-foot">
+        <span>{t.footer}</span>
+        <a href="https://github.com/harunnkcnn/fatura-lens">GitHub</a>
+      </footer>
+
+      {dragging && hasDocs && <div className="drop-overlay">{t.dropOverlay}</div>}
+      {selected && <DetailPanel t={t} doc={selected} onClose={closePanel} money={money} qty={qty} date={date} />}
+    </div>
+  );
+}
+
+function ErrorNotice({ t, errors, onDismiss }: { t: (typeof dictionaries)['tr']; errors: IngestError[]; onDismiss: () => void }) {
+  return (
+    <div className="notice is-error" role="alert">
+      <div>
+        <strong>{t.errorsTitle(errors.length)}</strong>
+        <ul>
+          {errors.slice(0, 8).map((e, i) => (
+            <li key={i}>
+              <span className="code">{e.fileName}</span>: {t.ingestReason[e.reason]}
+            </li>
+          ))}
+          {errors.length > 8 && <li>…</li>}
+        </ul>
+      </div>
+      <button type="button" className="btn btn-quiet" onClick={onDismiss}>
+        {t.dismiss}
+      </button>
+    </div>
+  );
+}
