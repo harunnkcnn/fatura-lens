@@ -88,7 +88,7 @@ export default function App() {
     if (!myIdsText) setMyIdsText(SAMPLE_MY_VKN);
     const xml = sampleFiles().map((s) => ({ name: s.name, bytes: encoder.encode(s.xml) }));
     const scans = await Promise.all(
-      SAMPLE_SCANS.map(async (name) => {
+      SAMPLE_SCANS.map(async (name): Promise<IngestSource | null> => {
         try {
           const res = await fetch(`${import.meta.env.BASE_URL}samples/${name}`);
           return res.ok ? { name, bytes: new Uint8Array(await res.arrayBuffer()) } : null;
@@ -97,7 +97,7 @@ export default function App() {
         }
       }),
     );
-    void addSources([...xml, ...scans.filter((s): s is IngestSource => s !== null)]);
+    void addSources([...xml, ...scans.filter((s) => s !== null)]);
   };
 
   // Whole-window drag and drop.
