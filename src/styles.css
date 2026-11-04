@@ -617,6 +617,33 @@ table.docs {
   color: var(--ink-soft);
   font-size: var(--t-xs);
 }
+.tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  font-size: var(--t-xs);
+  line-height: 1.6;
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-soft);
+  vertical-align: 1px;
+}
+.tag.is-paired {
+  border-color: color-mix(in srgb, var(--stamp) 45%, transparent);
+  color: var(--stamp);
+}
+.source-view {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.source-view img {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
 .dir {
   display: inline-block;
   font-size: var(--t-xs);

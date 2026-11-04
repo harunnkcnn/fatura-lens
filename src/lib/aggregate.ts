@@ -1,3 +1,4 @@
+import { compareWithKarekod } from './karekod';
 import type { Finding, UblDocument } from './types';
 
 export type Direction = 'incoming' | 'outgoing' | null;
@@ -76,25 +77,89 @@ export function summarize(docs: UblDocument[]): CurrencySummary[] {
 export interface MergeResult {
   docs: UblDocument[];
   skippedDuplicates: number;
+  /** Karekod documents matched to an XML document with the same ETTN. */
+  paired: number;
 }
 
 /**
- * Adds new documents to the collection. Byte-identical re-imports (same UUID,
- * same XML) are skipped; same UUID with different content is kept and flagged.
+ * Adds new documents to the collection.
+ * - Byte-identical XML re-imports and repeated karekods are skipped.
+ * - A karekod (PDF/photo) and an XML with the same ETTN become one row: the XML
+ *   keeps its full data, gains the preview, and any disagreement is flagged.
+ *   This also prevents counting the same invoice twice in the totals.
+ * - Same ETTN with different XML content is kept and flagged as a duplicate.
  */
 export function mergeDocuments(existing: UblDocument[], incoming: UblDocument[]): MergeResult {
-  const seen = new Map<string, string>(existing.filter((d) => d.uuid).map((d) => [d.uuid, d.xml]));
-  const added: UblDocument[] = [];
+  const docs = [...existing];
+  const byUuid = new Map<string, number>();
+  docs.forEach((d, i) => {
+    if (d.uuid && !byUuid.has(d.uuid)) byUuid.set(d.uuid, i);
+  });
   let skippedDuplicates = 0;
+  let paired = 0;
+
   for (const doc of incoming) {
-    if (doc.uuid && seen.get(doc.uuid) === doc.xml) {
+    const index = doc.uuid ? byUuid.get(doc.uuid) : undefined;
+    if (index === undefined) {
+      if (doc.uuid) byUuid.set(doc.uuid, docs.length);
+      docs.push(doc);
+      continue;
+    }
+    const current = docs[index]!;
+    if (doc.source === 'karekod') {
+      if (current.source === 'xml' && !current.pairedFile) {
+        docs[index] = pairWithKarekod(current, doc);
+        paired += 1;
+      } else {
+        skippedDuplicates += 1;
+      }
+      continue;
+    }
+    if (current.source === 'karekod') {
+      docs[index] = pairWithKarekod(doc, current);
+      paired += 1;
+      continue;
+    }
+    if (current.xml === doc.xml) {
       skippedDuplicates += 1;
       continue;
     }
-    if (doc.uuid) seen.set(doc.uuid, doc.xml);
-    added.push(doc);
+    docs.push(doc);
   }
-  return { docs: flagDuplicates([...existing, ...added]), skippedDuplicates };
+  return { docs: fillKnownNames(flagDuplicates(docs)), skippedDuplicates, paired };
+}
+
+/** Karekods carry IDs only; borrow company names from XML documents loaded in the same session. */
+function fillKnownNames(docs: UblDocument[]): UblDocument[] {
+  const names = new Map<string, string>();
+  for (const d of docs) {
+    if (d.source !== 'xml') continue;
+    for (const p of [d.supplier, d.customer]) {
+      const id = p.vkn ?? p.tckn;
+      if (id && p.name && !names.has(id)) names.set(id, p.name);
+    }
+  }
+  return docs.map((d) => {
+    if (d.source !== 'karekod') return d;
+    const fill = (p: UblDocument['supplier']) => (p.name ? p : { ...p, name: names.get(p.vkn ?? p.tckn ?? '') ?? '' });
+    const supplier = fill(d.supplier);
+    const customer = fill(d.customer);
+    return supplier === d.supplier && customer === d.customer ? d : { ...d, supplier, customer };
+  });
+}
+
+export function pairWithKarekod(xmlDoc: UblDocument, qrDoc: UblDocument): UblDocument {
+  const mismatches: Finding[] = compareWithKarekod(xmlDoc, qrDoc).map((d) => ({
+    level: 'error',
+    code: 'karekodMismatch',
+    params: { field: d.field, xml: d.xml, karekod: d.karekod, file: qrDoc.fileName },
+  }));
+  return {
+    ...xmlDoc,
+    preview: qrDoc.preview ?? xmlDoc.preview,
+    pairedFile: qrDoc.fileName,
+    findings: [...xmlDoc.findings.filter((f) => f.code !== 'karekodMismatch'), ...mismatches],
+  };
 }
 
 function flagDuplicates(docs: UblDocument[]): UblDocument[] {

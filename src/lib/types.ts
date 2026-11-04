@@ -73,7 +73,19 @@ export type FindingCode =
   | 'subtotalRateMismatch'
   | 'lineCountMismatch'
   | 'withholdingMissing'
-  | 'duplicateUuid';
+  | 'duplicateUuid'
+  | 'karekodOnly'
+  | 'karekodMismatch';
+
+/** Where a document's data came from. */
+export type DocSource = 'xml' | 'karekod';
+
+/** A rendered image of the PDF page or the photo a karekod was read from. */
+export interface SourcePreview {
+  fileName: string;
+  /** Object URL of a PNG/JPEG; revoked when documents are cleared. */
+  url: string;
+}
 
 export interface UblDocument {
   /** Stable key within a session (file + index) */
@@ -97,13 +109,18 @@ export interface UblDocument {
   despatch: DespatchInfo | null;
   notes: string[];
   hasXslt: boolean;
-  /** Serialized XML of this document only (envelopes are unwrapped). */
+  /** Serialized XML of this document only (envelopes are unwrapped). Empty for karekod-only documents. */
   xml: string;
+  source: DocSource;
+  /** PDF page or photo carrying this document's karekod, if one was imported. */
+  preview: SourcePreview | null;
+  /** File name of the PDF/photo whose karekod was matched to this XML document. */
+  pairedFile: string | null;
   findings: Finding[];
 }
 
 export interface IngestError {
   fileName: string;
-  reason: 'notXml' | 'parseError' | 'noUblDocument' | 'tooLarge' | 'zipError' | 'zipLimit';
+  reason: 'notXml' | 'parseError' | 'noUblDocument' | 'tooLarge' | 'zipError' | 'zipLimit' | 'noKarekod' | 'scanError';
   detail?: string;
 }

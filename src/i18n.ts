@@ -4,14 +4,45 @@ export type Locale = 'tr' | 'en';
 
 const trRoles: Record<string, string> = { supplier: 'Gönderen', customer: 'Alıcı' };
 const enRoles: Record<string, string> = { supplier: 'Supplier', customer: 'Customer' };
+const trFields: Record<string, string> = {
+  number: 'Belge no',
+  issueDate: 'Tarih',
+  supplierId: 'Gönderen VKN/TCKN',
+  customerId: 'Alıcı VKN/TCKN',
+  currency: 'Para birimi',
+  vat: 'KDV',
+  taxInclusive: 'Vergiler dahil',
+  payable: 'Ödenecek',
+  plate: 'Plaka',
+};
+const enFields: Record<string, string> = {
+  number: 'Number',
+  issueDate: 'Date',
+  supplierId: 'Supplier ID',
+  customerId: 'Customer ID',
+  currency: 'Currency',
+  vat: 'VAT',
+  taxInclusive: 'Incl. taxes',
+  payable: 'Payable',
+  plate: 'Plate',
+};
+
+
+/** Formats "1234.50"-style finding params as locale money; other values pass through. */
+const moneyParam = (locale: string) => {
+  const nf = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (v: string | number | undefined) => (typeof v === 'string' && /^-?\d+\.\d{2}$/.test(v) ? nf.format(Number(v)) : String(v ?? ''));
+};
+const trm = moneyParam('tr-TR');
+const enm = moneyParam('en-US');
 
 const tr = {
-  appTagline: 'e-Fatura, e-Arşiv ve e-İrsaliye XML okuyucu',
+  appTagline: 'e-Fatura, e-Arşiv ve e-İrsaliye okuyucu',
   heroTitle: 'Faturaları tek tek açmayın. Hepsini birden bırakın.',
   heroBody:
-    'e-Fatura, e-Arşiv ve e-İrsaliye XML dosyalarını ya da ZIP arşivlerini sürükleyin. Toplamlar, KDV dağılımı, tevkifat ve tutarsızlıklar saniyeler içinde önünüzde.',
+    'e-Fatura, e-Arşiv ve e-İrsaliye XML dosyalarını, ZIP arşivlerini ya da karekodlu PDF ve fotoğrafları sürükleyin. Toplamlar, KDV dağılımı, tevkifat ve tutarsızlıklar saniyeler içinde önünüzde.',
   dropCta: 'Dosya seç',
-  dropHint: 'XML veya ZIP · birden fazla dosya · GİB zarfları desteklenir',
+  dropHint: 'XML, ZIP, PDF veya karekodlu fotoğraf. Birden fazla dosya ve GİB zarfları desteklenir.',
   dropOverlay: 'Bırakın, okuyalım',
   trySamples: 'Örnek dosyalarla dene',
   privacy: 'Dosyalarınız bu cihazdan çıkmaz. Fatura Lens sunucuya hiçbir şey göndermez; internet bağlantısı olmadan da çalışır.',
@@ -38,6 +69,13 @@ const tr = {
   onlyIssues: 'Yalnızca sorunlular',
   loading: (done: number, total: number) => `${done} / ${total} dosya okunuyor…`,
   skipped: (n: number) => `${n} belge zaten listedeydi, tekrar eklenmedi.`,
+  paired: (n: number) => `${n} PDF/görsel, aynı ETTN'li XML ile eşleştirildi ve karşılaştırıldı.`,
+  sourceKarekod: 'Karekod',
+  sourcePaired: 'XML + PDF',
+  source: 'Kaynak',
+  tabSource: 'PDF / görsel',
+  noLinesKarekod: 'Karekod satır bilgisi taşımaz. Satırları görmek için bu faturanın XML dosyasını da ekleyin; aynı ETTN otomatik eşleşir.',
+  previewAlt: (file: string) => `${file} dosyasının karekod bulunan sayfası`,
   docsCount: (n: number) => `${n} belge`,
   shownOf: (shown: number, total: number) => `${total} belgeden ${shown} tanesi gösteriliyor`,
   showMore: 'Daha fazla göster',
@@ -117,6 +155,8 @@ const tr = {
     tooLarge: '50 MB sınırını aşıyor',
     zipError: 'ZIP açılamadı',
     zipLimit: 'ZIP güvenlik sınırını aşıyor (iç içe arşiv, dosya sayısı veya boyut)',
+    noKarekod: 'GİB karekodu bulunamadı. Daha net bir tarama ya da faturanın PDF hâlini deneyin.',
+    scanError: 'Dosya taranamadı (bozuk ya da şifreli olabilir)',
   } satisfies Record<IngestError['reason'], string>,
   dismiss: 'Gizle',
   footer: 'Açık kaynak · MIT lisansı',
@@ -129,26 +169,28 @@ const tr = {
     numberYearMismatch: (p) => `Numaradaki yıl (${p.numberYear}) düzenleme yılıyla (${p.dateYear}) uyuşmuyor.`,
     badVkn: (p) => `${trRoles[String(p.role)]} VKN kontrol hanesi tutmuyor: ${p.value}`,
     badTckn: (p) => `${trRoles[String(p.role)]} TCKN kontrol hanesi tutmuyor: ${p.value}`,
-    lineSumMismatch: (p) => `Satır toplamı ${p.lines}, belgedeki mal/hizmet toplamı ${p.total}.`,
-    taxExclusiveMismatch: (p) => `Vergi hariç tutar ${p.expected} olmalı, belgede ${p.actual}.`,
-    taxInclusiveMismatch: (p) => `Vergiler dahil tutar ${p.expected} olmalı, belgede ${p.actual}.`,
-    taxTotalMismatch: (p) => `Vergi toplamı ${p.declared}, alt kırılımların toplamı ${p.sum}.`,
-    subtotalRateMismatch: (p) => `${p.tax} %${p.percent}: hesaplanan ${p.expected}, belgede ${p.actual}.`,
-    lineCountMismatch: (p) => `Satır sayısı ${p.declared} bildirilmiş, belgede ${p.actual} satır var.`,
+    lineSumMismatch: (p) => `Satır toplamı ${trm(p.lines)}, belgedeki mal/hizmet toplamı ${trm(p.total)}.`,
+    taxExclusiveMismatch: (p) => `Vergi hariç tutar ${trm(p.expected)} olmalı, belgede ${trm(p.actual)}.`,
+    taxInclusiveMismatch: (p) => `Vergiler dahil tutar ${trm(p.expected)} olmalı, belgede ${trm(p.actual)}.`,
+    taxTotalMismatch: (p) => `Vergi toplamı ${trm(p.declared)}, alt kırılımların toplamı ${trm(p.sum)}.`,
+    subtotalRateMismatch: (p) => `${p.tax} %${p.percent}: hesaplanan ${trm(p.expected)}, belgede ${trm(p.actual)}.`,
+    lineCountMismatch: (p) => `Satır sayısı ${trm(p.declared)} bildirilmiş, belgede ${trm(p.actual)} satır var.`,
     withholdingMissing: () => 'Tip TEVKIFAT ama tevkifat kırılımı yok.',
     duplicateUuid: (p) => `Aynı ETTN farklı içerikle birden fazla kez yüklendi: ${p.value}`,
+    karekodOnly: () => 'Karekoddan okundu: özet bilgiler var, satırlar ve firma adları yok. Aynı faturanın XML dosyasını eklerseniz otomatik eşleşir.',
+    karekodMismatch: (p) => `PDF karekodu XML ile uyuşmuyor. ${trFields[String(p.field)] ?? p.field}: XML'de ${trm(p.xml)}, karekodda ${trm(p.karekod)}.`,
   } satisfies Record<Finding['code'], (p: Record<string, string | number>) => string>,
 };
 
 export type Dict = typeof tr;
 
 const en: Dict = {
-  appTagline: 'Reader for Turkish e-invoice and e-despatch XML',
+  appTagline: 'Reader for Turkish e-invoices and e-despatch notes',
   heroTitle: 'Stop opening invoices one by one. Drop them all at once.',
   heroBody:
-    'Drag in UBL-TR e-Fatura, e-Arşiv and e-İrsaliye XML files or ZIP archives. Totals, VAT by rate, withholding and inconsistencies appear in seconds.',
+    'Drag in UBL-TR e-Fatura, e-Arşiv and e-İrsaliye XML files, ZIP archives, or PDFs and photos with the GİB karekod. Totals, VAT by rate, withholding and inconsistencies appear in seconds.',
   dropCta: 'Choose files',
-  dropHint: 'XML or ZIP · multiple files · GİB envelopes supported',
+  dropHint: 'XML, ZIP, PDF or a photo with the karekod. Multiple files and GİB envelopes supported.',
   dropOverlay: 'Drop to read',
   trySamples: 'Try with sample files',
   privacy: 'Your files never leave this device. Fatura Lens sends nothing to a server and works offline.',
@@ -175,6 +217,13 @@ const en: Dict = {
   onlyIssues: 'Only with findings',
   loading: (done, total) => `Reading ${done} of ${total} files…`,
   skipped: (n) => `${n} document(s) were already listed and were not added again.`,
+  paired: (n) => `${n} PDF/photo(s) matched to the XML with the same ETTN and compared.`,
+  sourceKarekod: 'Karekod',
+  sourcePaired: 'XML + PDF',
+  source: 'Source',
+  tabSource: 'PDF / photo',
+  noLinesKarekod: 'A karekod carries no line items. Add this invoice’s XML too; the same ETTN is matched automatically.',
+  previewAlt: (file) => `Page of ${file} where the karekod was found`,
   docsCount: (n) => `${n} document${n === 1 ? '' : 's'}`,
   shownOf: (shown, total) => `Showing ${shown} of ${total} documents`,
   showMore: 'Show more',
@@ -253,6 +302,8 @@ const en: Dict = {
     tooLarge: 'Exceeds the 50 MB limit',
     zipError: 'Could not open ZIP',
     zipLimit: 'ZIP exceeds safety limits (nesting, file count or size)',
+    noKarekod: 'No GİB karekod found. Try a sharper scan or the invoice’s PDF.',
+    scanError: 'Could not scan the file (it may be damaged or encrypted)',
   },
   dismiss: 'Dismiss',
   footer: 'Open source · MIT license',
@@ -265,14 +316,16 @@ const en: Dict = {
     numberYearMismatch: (p) => `Year in number (${p.numberYear}) differs from issue year (${p.dateYear}).`,
     badVkn: (p) => `${enRoles[String(p.role)]} VKN fails its check digit: ${p.value}`,
     badTckn: (p) => `${enRoles[String(p.role)]} TCKN fails its check digit: ${p.value}`,
-    lineSumMismatch: (p) => `Lines add up to ${p.lines}; document line total says ${p.total}.`,
-    taxExclusiveMismatch: (p) => `Tax-exclusive amount should be ${p.expected}; document says ${p.actual}.`,
-    taxInclusiveMismatch: (p) => `Tax-inclusive amount should be ${p.expected}; document says ${p.actual}.`,
-    taxTotalMismatch: (p) => `Tax total is ${p.declared}; its subtotals add up to ${p.sum}.`,
-    subtotalRateMismatch: (p) => `${p.tax} ${p.percent}%: computed ${p.expected}, document says ${p.actual}.`,
-    lineCountMismatch: (p) => `Declares ${p.declared} lines but contains ${p.actual}.`,
+    lineSumMismatch: (p) => `Lines add up to ${enm(p.lines)}; document line total says ${enm(p.total)}.`,
+    taxExclusiveMismatch: (p) => `Tax-exclusive amount should be ${enm(p.expected)}; document says ${enm(p.actual)}.`,
+    taxInclusiveMismatch: (p) => `Tax-inclusive amount should be ${enm(p.expected)}; document says ${enm(p.actual)}.`,
+    taxTotalMismatch: (p) => `Tax total is ${enm(p.declared)}; its subtotals add up to ${enm(p.sum)}.`,
+    subtotalRateMismatch: (p) => `${p.tax} ${p.percent}%: computed ${enm(p.expected)}, document says ${enm(p.actual)}.`,
+    lineCountMismatch: (p) => `Declares ${enm(p.declared)} lines but contains ${enm(p.actual)}.`,
     withholdingMissing: () => 'Type is TEVKIFAT but there is no withholding breakdown.',
     duplicateUuid: (p) => `Same ETTN loaded more than once with different content: ${p.value}`,
+    karekodOnly: () => 'Read from the karekod: summary only, no line items or company names. Add the same invoice’s XML and it is matched automatically.',
+    karekodMismatch: (p) => `PDF karekod disagrees with the XML. ${enFields[String(p.field)] ?? p.field}: XML says ${enm(p.xml)}, karekod says ${enm(p.karekod)}.`,
   },
 };
 

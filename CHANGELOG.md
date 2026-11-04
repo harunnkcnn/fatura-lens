@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0 · 2026-11-05
+
+- Read PDFs and photos (PNG, JPEG, WebP) through the GİB karekod: number, ETTN, parties, VAT by rate and totals, decoded locally with pdf.js and zxing-wasm (loaded on demand)
+- Multi-page PDFs: every page is scanned, so a batch PDF becomes one row per invoice
+- XML ↔ PDF cross-check: same ETTN becomes one row, counted once, with every disagreeing field flagged
+- Company names for karekod-only rows are filled in from XML documents in the same session
+- Checks tolerate the conventions in GİB's public example set (line totals after discounts, VAT net of withholding)
+- New demo samples: two PDFs and a phone photo with real GİB-format karekods
+
 ## 0.1.0 · 2026-11-05
 
 First public release.

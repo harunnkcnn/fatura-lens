@@ -1,0 +1,74 @@
+{
+  "$comment": "Synthetic GİB karekod payloads for the demo PDFs/photos in public/samples. Regenerate the files with: node scripts/make-samples.mjs",
+  "samples": [
+    {
+      "file": "ANK2026000001247.pdf",
+      "title": "e-FATURA",
+      "supplierName": "Anka Yedek Parça Sanayi A.Ş.",
+      "customerName": "Boğaziçi Lojistik Ltd. Şti.",
+      "note": "Karekod XML ile birebir aynı.",
+      "payload": {
+        "vkntckn": "0741234560",
+        "avkntckn": "1834567894",
+        "senaryo": "TICARIFATURA",
+        "tip": "SATIS",
+        "tarih": "2026-10-02",
+        "no": "ANK2026000001247",
+        "ettn": "3f2b8c1d-7e4a-4b9c-a1d2-5e6f7a8b9c0d",
+        "parabirimi": "TRY",
+        "malhizmettoplam": "26800.00",
+        "kdvmatrah(20)": "25500.00",
+        "hesaplanankdv(20)": "5100.00",
+        "kdvmatrah(10)": "1300.00",
+        "hesaplanankdv(10)": "130.00",
+        "vergidahil": "32030.00",
+        "odenecek": "32030.00"
+      }
+    },
+    {
+      "file": "BGZ2026000000388.pdf",
+      "title": "e-FATURA",
+      "supplierName": "Boğaziçi Lojistik Ltd. Şti.",
+      "customerName": "Anka Yedek Parça Sanayi A.Ş.",
+      "note": "PDF'te tevkifat düşülmemiş: ödenecek tutar XML'den farklı.",
+      "payload": {
+        "vkntckn": "1834567894",
+        "avkntckn": "0741234560",
+        "senaryo": "TEMELFATURA",
+        "tip": "TEVKIFAT",
+        "tarih": "2026-10-06",
+        "no": "BGZ2026000000388",
+        "ettn": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+        "parabirimi": "TRY",
+        "malhizmettoplam": "48000.00",
+        "kdvmatrah(20)": "48000.00",
+        "hesaplanankdv(20)": "9600.00",
+        "vergidahil": "57600.00",
+        "odenecek": "57600.00"
+      }
+    },
+    {
+      "file": "kirtasiye-fis.jpg",
+      "title": "e-ARŞİV FATURA",
+      "supplierName": "Kuzey Kırtasiye ve Ofis Malzemeleri",
+      "customerName": "Anka Yedek Parça Sanayi A.Ş.",
+      "note": "Yalnızca fotoğrafı olan bir e-Arşiv fatura.",
+      "photo": true,
+      "payload": {
+        "vkntckn": "4812345674",
+        "avkntckn": "0741234560",
+        "senaryo": "EARSIVFATURA",
+        "tip": "SATIS",
+        "tarih": "2026-10-30",
+        "no": "KZY2026000000913",
+        "ettn": "5c4b3a29-1807-4f6e-9d5c-4b3a29180716",
+        "parabirimi": "TRY",
+        "malhizmettoplam": "2450.00",
+        "kdvmatrah(20)": "2450.00",
+        "hesaplanankdv (20)": "490.00",
+        "vergidahil": "2940.00",
+        "odenecek": "2940.00"
+      }
+    }
+  ]
+}

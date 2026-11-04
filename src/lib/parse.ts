@@ -92,6 +92,9 @@ function parseDocument(root: Element, meta: { fileName: string; key: string; xml
       .filter(Boolean),
     hasXslt: findXsltNode(root) !== null,
     xml: meta.xml,
+    source: 'xml',
+    preview: null,
+    pairedFile: null,
     findings: [],
   };
   doc.findings = runChecks(doc, root);

@@ -7,6 +7,8 @@ Fatura Lens bundles or depends on the following components. Each keeps its own l
 | [React](https://react.dev) | UI | MIT |
 | [fflate](https://github.com/101arrowz/fflate) | ZIP reading | MIT |
 | [xslt-polyfill](https://github.com/mfreed7/xslt_polyfill) | WASM XSLT fallback (bundles libxslt and libxml2, MIT) | BSD-3-Clause |
+| [pdf.js](https://github.com/mozilla/pdf.js) | Rendering PDF pages to read their karekod | Apache-2.0 |
+| [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) | QR decoding (bundles [ZXing-C++](https://github.com/zxing-cpp/zxing-cpp), Apache-2.0) | MIT |
 | [IBM Plex Sans / Mono](https://github.com/IBM/plex) via Fontsource | Typography | SIL Open Font License 1.1 |
 
 ## xslt-polyfill
@@ -96,3 +98,33 @@ SOFTWARE.
 ## IBM Plex
 
 IBM Plex is licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
+
+## zxing-wasm
+
+```
+MIT License
+
+Copyright (c) 2023 Ze-Zheng Wu
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## pdf.js
+
+Licensed under the Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0

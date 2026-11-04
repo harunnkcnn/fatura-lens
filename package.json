@@ -1,8 +1,8 @@
 {
   "name": "fatura-lens",
   "private": true,
-  "version": "0.1.0",
-  "description": "Open-source, offline viewer and batch analyzer for Turkish UBL-TR e-Fatura, e-Arşiv and e-İrsaliye XML files.",
+  "version": "0.2.0",
+  "description": "Open-source, offline batch reader for Turkish e-Fatura, e-Arşiv and e-İrsaliye: XML, ZIP, PDF and photos via the GİB karekod.",
   "license": "MIT",
   "type": "module",
   "author": "Harun (https://github.com/harunnkcnn)",
@@ -19,7 +19,10 @@
     "xml",
     "invoice",
     "turkey",
-    "offline"
+    "offline",
+    "karekod",
+    "qr-code",
+    "pdf"
   ],
   "scripts": {
     "dev": "vite",
@@ -33,15 +36,20 @@
     "@fontsource/ibm-plex-mono": "^5.1.0",
     "@fontsource/ibm-plex-sans": "^5.1.0",
     "fflate": "^0.8.2",
+    "pdfjs-dist": "^6.5.438",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "xslt-polyfill": "^1.0.34"
+    "xslt-polyfill": "^1.0.34",
+    "zxing-wasm": "^3.1.6"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
     "jsdom": "^26.0.0",
+    "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4",
     "typescript": "~5.8.0",
     "vite": "^7.0.0",
     "vitest": "^5.1.0"

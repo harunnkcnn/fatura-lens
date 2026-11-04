@@ -54,7 +54,8 @@ export function documentRows(docs: UblDocument[], myIds: ReadonlySet<string>): C
     d.lines.length,
     d.despatch?.plate ?? '',
     d.findings.length,
-    d.fileName,
+    d.source === 'karekod' ? 'karekod' : d.pairedFile ? 'xml+karekod' : 'xml',
+    d.pairedFile ? `${d.fileName} + ${d.pairedFile}` : d.fileName,
   ]);
 }
 

@@ -3,7 +3,7 @@ import { describeFinding, type Dict } from '../i18n';
 import type { DocLine, Party, UblDocument } from '../lib/types';
 import { OriginalView } from './OriginalView';
 
-type Tab = 'summary' | 'original' | 'lines' | 'checks' | 'xml';
+type Tab = 'summary' | 'original' | 'source' | 'lines' | 'checks' | 'xml';
 
 interface Props {
   t: Dict;
@@ -17,13 +17,14 @@ interface Props {
 const LEVEL_ORDER = { error: 0, warning: 1, info: 2 } as const;
 
 export function DetailPanel({ t, doc, onClose, money, qty, date }: Props) {
-  const [tab, setTab] = useState<Tab>(doc.hasXslt ? 'original' : 'summary');
+  const initialTab: Tab = doc.hasXslt ? 'original' : doc.preview ? 'source' : 'summary';
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [copied, setCopied] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
   const closeBtn = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    setTab(doc.hasXslt ? 'original' : 'summary');
+    setTab(doc.hasXslt ? 'original' : doc.preview ? 'source' : 'summary');
     closeBtn.current?.focus();
   }, [doc]);
 
@@ -49,10 +50,11 @@ export function DetailPanel({ t, doc, onClose, money, qty, date }: Props) {
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'summary', label: t.tabSummary },
-    ...(doc.kind !== 'despatch' || doc.hasXslt ? [{ id: 'original' as const, label: t.tabOriginal }] : []),
+    ...((doc.kind !== 'despatch' && doc.source === 'xml') || doc.hasXslt ? [{ id: 'original' as const, label: t.tabOriginal }] : []),
+    ...(doc.preview ? [{ id: 'source' as const, label: t.tabSource }] : []),
     { id: 'lines', label: t.tabLines, count: doc.lines.length },
     { id: 'checks', label: t.tabChecks, count: doc.findings.length },
-    { id: 'xml', label: t.tabXml },
+    ...(doc.xml ? [{ id: 'xml' as const, label: t.tabXml }] : []),
   ];
 
   const onTabKey = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -110,6 +112,12 @@ export function DetailPanel({ t, doc, onClose, money, qty, date }: Props) {
         <div className="panel-body" id="panel-tabpanel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
           {tab === 'summary' && <Summary t={t} doc={doc} money={money} date={date} />}
           {tab === 'original' && <OriginalView t={t} doc={doc} />}
+          {tab === 'source' && doc.preview && (
+            <figure className="source-view">
+              <img src={doc.preview.url} alt={t.previewAlt(doc.preview.fileName)} />
+              <figcaption className="muted code">{doc.preview.fileName}</figcaption>
+            </figure>
+          )}
           {tab === 'lines' && <Lines t={t} doc={doc} money={money} qty={qty} />}
           {tab === 'checks' && <Checks t={t} doc={doc} />}
           {tab === 'xml' && (
@@ -164,7 +172,24 @@ function Summary({ t, doc, money, date }: { t: Dict; doc: UblDocument; money: Pr
         {doc.despatch?.trailerPlate && <Fact label={t.trailer} value={doc.despatch.trailerPlate} />}
         {doc.despatch?.driver && <Fact label={t.driver} value={doc.despatch.driver} />}
         {doc.despatch?.carrier && <Fact label={t.carrier} value={doc.despatch.carrier} />}
-        <Fact label={t.file} value={<span className="code">{doc.fileName}</span>} />
+        <Fact
+          label={t.source}
+          value={doc.source === 'karekod' ? t.sourceKarekod : doc.pairedFile ? t.sourcePaired : 'XML'}
+        />
+        <Fact
+          label={t.file}
+          value={
+            <span className="code">
+              {doc.fileName}
+              {doc.pairedFile && (
+                <>
+                  <br />
+                  {doc.pairedFile}
+                </>
+              )}
+            </span>
+          }
+        />
       </dl>
 
       {tot && (
@@ -240,6 +265,7 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 function Lines({ t, doc, money, qty }: { t: Dict; doc: UblDocument; money: Props['money']; qty: Props['qty'] }) {
+  if (doc.source === 'karekod') return <p className="muted">{t.noLinesKarekod}</p>;
   const isMoney = doc.kind !== 'despatch';
   return (
     <div className="ledger-wrap">

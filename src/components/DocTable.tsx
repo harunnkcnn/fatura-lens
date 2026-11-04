@@ -113,15 +113,16 @@ export function DocTable(props: Props) {
                 </td>
                 <td className="type c-type">
                   {t.kindLabel[doc.kind]}
+                  {(doc.source === 'karekod' || doc.pairedFile) && (
+                    <span className={`tag${doc.source === 'karekod' ? '' : ' is-paired'}`}>{doc.source === 'karekod' ? t.sourceKarekod : t.sourcePaired}</span>
+                  )}
                   <small>{[doc.profile, doc.typeCode].filter(Boolean).join(' / ')}</small>
                 </td>
                 <td className="party c-supplier" title={doc.supplier.name}>
-                  {doc.supplier.name || '—'}
-                  <small>{doc.supplier.vkn ?? doc.supplier.tckn ?? ''}</small>
+                  <PartyCell name={doc.supplier.name} id={doc.supplier.vkn ?? doc.supplier.tckn} />
                 </td>
                 <td className="party c-customer" title={doc.customer.name}>
-                  {doc.customer.name || '—'}
-                  <small>{doc.customer.vkn ?? doc.customer.tckn ?? ''}</small>
+                  <PartyCell name={doc.customer.name} id={doc.customer.vkn ?? doc.customer.tckn} />
                 </td>
                 <td className="num c-net">{doc.totals ? money(doc.totals.taxExclusive) + cur : '—'}</td>
                 <td className="num c-vat">{doc.totals ? money(doc.totals.vat) : '—'}</td>
@@ -143,5 +144,16 @@ export function DocTable(props: Props) {
         )}
       </div>
     </div>
+  );
+}
+
+/** Karekod-only documents carry IDs but no names; show the ID in their place. */
+function PartyCell({ name, id }: { name: string; id: string | undefined }) {
+  if (!name) return <>{id || '—'}</>;
+  return (
+    <>
+      {name}
+      <small>{id ?? ''}</small>
+    </>
   );
 }
