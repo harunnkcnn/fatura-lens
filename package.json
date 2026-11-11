@@ -39,7 +39,7 @@
     "pdfjs-dist": "^6.5.438",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "xslt-polyfill": "^1.0.34",
+    "xslt-polyfill": "^1.0.36",
     "zxing-wasm": "^3.1.6"
   },
   "devDependencies": {
